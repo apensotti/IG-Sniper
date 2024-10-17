@@ -174,21 +174,18 @@ func login(username string, password string) (*http.Response, string) {
 
 func getLines(path string) []string {
 	file, err := os.Open(path)
-
 	if err != nil {
 		color.Red.Println("\nUnable to open text file:", path)
 		color.Red.Printf("Make sure path \"%v\" is available\n", path)
 		fmt.Scanln()
 	}
 	defer file.Close()
-
 	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 	return lines
-
 }
 
 func readAccFromEnv() Account {
@@ -236,14 +233,13 @@ func main() {
 		var attemptCount int = 0
 
 		for _, target := range accTargets {
-			attemptCount += 1
+			attemptCount++
 			fmt.Printf("[%s] Checking username: %s\n", in("+"), target)
 
 			if createCheck(target) {
 				updateDetails(csrf, emailLogin, target)
 			}
 		}
-
 	} else {
 		fmt.Printf("[%s] Unable to log in. Status Code: %v\n", in("!"), resp.StatusCode)
 		fmt.Println(string(body))
