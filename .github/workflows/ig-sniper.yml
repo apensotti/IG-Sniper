@@ -19,7 +19,9 @@ jobs:
     - name: Initialize Go module
       run: |
         go mod init github.com/${{ github.repository }}
-        go mod tidy
+
+    - name: Tidy Go module
+      run: go mod tidy
 
     - name: Install dependencies
       run: |
