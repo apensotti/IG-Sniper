@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
+	"net/smtp"
 )
 
 var (
@@ -276,5 +277,15 @@ func main() {
 	} else {
 		fmt.Printf("[%s] Unable to log in. Status Code: %v\n", in("!"), resp.StatusCode)
 		fmt.Println(string(body))
+	}
+
+	// Send email notification for script start
+	startEmailSubject := "IG Sniper Script Started"
+	startEmailBody := "The IG Sniper script has started running."
+	err := sendEmail(os.Getenv("IG_EMAIL"), startEmailSubject, startEmailBody)
+	if err != nil {
+		color.Red.Printf("[%s] Failed to send start notification email: %v\n", in("!"), err)
+	} else {
+		color.Green.Printf("[%s] Start notification email sent to %s\n", in("*"), os.Getenv("IG_EMAIL"))
 	}
 }
