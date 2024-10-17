@@ -299,9 +299,10 @@ func main() {
 
 		// Send email with results
 		emailSubject := "IG Sniper Results"
-		emailBody := generateEmailContent(accTarget
-			s, results)
+		emailBody := generateEmailContent(accTargets, results)
+		emailBody += "\n\nDetails:\n" + details.String()
 		err := sendEmail(emailLogin, emailSubject, emailBody)
+
 		if err != nil {
 			logDetails(&details, "Failed to send results email: %v", err)
 		} else {
