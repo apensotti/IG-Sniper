@@ -36,4 +36,8 @@ jobs:
         IG_USERNAME: ${{ secrets.IG_USERNAME }}
         IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
         IG_TARGETS: ${{ secrets.IG_TARGETS }}
+        SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        SMTP_HOST: ${{ secrets.SMTP_HOST }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
       run: ./ig-sniper

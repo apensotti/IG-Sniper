@@ -10,7 +10,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
-
+	"strconv"
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
 )
@@ -48,7 +48,7 @@ func getCSRF() string {
 	return ""
 }
 
-func updateDetails(csrfToken string, email string, username string) {
+func updateDetails(csrfToken string, email string, username string) bool {
 	data := "first_name=&email=" + email + "&username=" + username + "&phone_number=&biography=" + "" + "&external_url=&chaining_enabled=on"
 	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/edit/", bytes.NewBuffer([]byte(data)))
 	req.Header.Set("accept", "*/*")
@@ -76,6 +76,12 @@ func updateDetails(csrfToken string, email string, username string) {
 		color.Red.Println("[+] Rate limited")
 	}
 
+	if strings.Contains(response, "\"status\":\"ok\"") {
+		color.Green.Printf("[+] Successfully updated username to %s\n", username)
+		return true
+	}
+
+	return false
 }
 
 func urlCheck(check string) bool {
@@ -197,6 +203,26 @@ func getTargetsFromEnv() []string {
 	return strings.Split(targetsStr, ",")
 }
 
+func sendEmail(to, subject, body string) error {
+	from := os.Getenv("SMTP_FROM")
+	password := os.Getenv("SMTP_PASSWORD")
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+
+	msg := []byte("To: " + to + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"\r\n" +
+		body + "\r\n")
+
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, msg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	fmt.Print("\033[H\033[2J")
 
@@ -233,7 +259,18 @@ func main() {
 			fmt.Printf("[%s] Checking username: %s\n", in("+"), target)
 
 			if createCheck(target) {
-				updateDetails(csrf, emailLogin, target)
+				if updateDetails(csrf, emailLogin, target) {
+					color.Green.Printf("[%s] Successfully claimed username: %s\n", in("*"), target)
+					emailSubject := "Instagram Username Claimed"
+					emailBody := fmt.Sprintf("The username %s has been successfully claimed.", target)
+					err := sendEmail(emailLogin, emailSubject, emailBody)
+					if err != nil {
+						color.Red.Printf("[%s] Failed to send email notification: %v\n", in("!"), err)
+					} else {
+						color.Green.Printf("[%s] Email notification sent to %s\n", in("*"), emailLogin)
+					}
+					return // Exit the program after successfully claiming the username
+				}
 			}
 		}
 	} else {
