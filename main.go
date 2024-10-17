@@ -10,6 +10,8 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
+	"math/rand"
+	"time"
 
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
@@ -48,7 +50,7 @@ func getCSRF() string {
 	return ""
 }
 
-func updateDetails(csrfToken string, email string, username string) {
+func updateDetails(csrfToken string, email string, username string) bool {
 	data := "first_name=&email=" + email + "&username=" + username + "&phone_number=&biography=" + "" + "&external_url=&chaining_enabled=on"
 	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/edit/", bytes.NewBuffer([]byte(data)))
 	req.Header.Set("accept", "*/*")
@@ -74,8 +76,16 @@ func updateDetails(csrfToken string, email string, username string) {
 
 	if strings.Contains(response, "Please wait a few minutes before you try again") {
 		color.Red.Println("[+] Rate limited")
+		return false
 	}
 
+	if strings.Contains(response, "\"status\":\"ok\"") {
+		color.Green.Printf("[+] Successfully updated username to %s\n", username)
+		return true
+	}
+
+	color.Yellow.Println("[+] Failed to update username")
+	return false
 }
 
 func urlCheck(check string) bool {
@@ -227,13 +237,35 @@ func main() {
 		fmt.Printf("[%s] Authenticated: True, userID: %s\n", in("*"), decode(body)["userId"])
 
 		var attemptCount int = 0
+		rand.Seed(time.Now().UnixNano())
 
-		for _, target := range accTargets {
-			attemptCount++
-			fmt.Printf("[%s] Checking username: %s\n", in("+"), target)
+		for {
+			for _, target := range accTargets {
+				attemptCount++
+				fmt.Printf("[%s] Checking username: %s (Attempt: %d)\n", in("+"), target, attemptCount)
 
-			if createCheck(target) {
-				updateDetails(csrf, emailLogin, target)
+				if createCheck(target) {
+					if updateDetails(csrf, emailLogin, target) {
+						color.Green.Printf("[%s] Successfully claimed username: %s\n", in("*"), target)
+						return // Exit the program after successfully claiming the username
+					}
+				}
+			}
+
+			// Random wait time between 23 and 48 minutes
+			waitTime := time.Duration(rand.Intn(25)+23) * time.Minute
+			fmt.Printf("[%s] Waiting for %v before next attempt...\n", in("*"), waitTime)
+			time.Sleep(waitTime)
+
+			// Refresh login every 5 attempts to maintain session
+			if attemptCount%5 == 0 {
+				fmt.Printf("[%s] Refreshing login...\n", in("*"))
+				resp, csrf = login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
+				body, _ = ioutil.ReadAll(resp.Body)
+				if !strings.Contains(string(body), "\"authenticated\":true") {
+					color.Red.Println("[!] Failed to refresh login. Exiting...")
+					return
+				}
 			}
 		}
 	} else {
