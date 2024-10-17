@@ -223,8 +223,30 @@ func sendEmail(to, subject, body string) error {
 	return nil
 }
 
+func generateEmailContent(targets []string, results map[string]bool) string {
+	content := "IG Sniper Results:\n\n"
+	for _, target := range targets {
+		status := "Unavailable"
+		if results[target] {
+			status = "Available"
+		}
+		content += fmt.Sprintf("Username: %s - Status: %s\n", target, status)
+	}
+	return content
+}
+
 func main() {
 	fmt.Print("\033[H\033[2J")
+
+	// Send email notification for script start
+	startEmailSubject := "IG Sniper Script Started"
+	startEmailBody := "The IG Sniper script has started running."
+	err := sendEmail(os.Getenv("IG_EMAIL"), startEmailSubject, startEmailBody)
+	if err != nil {
+		color.Red.Printf("[%s] Failed to send start notification email: %v\n", in("!"), err)
+	} else {
+		color.Green.Printf("[%s] Start notification email sent to %s\n", in("*"), os.Getenv("IG_EMAIL"))
+	}
 
 	acc := readAccFromEnv()
 	accTargets := getTargetsFromEnv()
@@ -252,13 +274,13 @@ func main() {
 		fmt.Printf("[%s] Successfully logged in\n", in("*"))
 		fmt.Printf("[%s] Authenticated: True, userID: %s\n", in("*"), decode(body)["userId"])
 
-		var attemptCount int = 0
+		results := make(map[string]bool)
 
 		for _, target := range accTargets {
-			attemptCount++
 			fmt.Printf("[%s] Checking username: %s\n", in("+"), target)
 
 			if createCheck(target) {
+				results[target] = true
 				if updateDetails(csrf, emailLogin, target) {
 					color.Green.Printf("[%s] Successfully claimed username: %s\n", in("*"), target)
 					emailSubject := "Instagram Username Claimed"
@@ -271,20 +293,22 @@ func main() {
 					}
 					return // Exit the program after successfully claiming the username
 				}
+			} else {
+				results[target] = false
 			}
+		}
+
+		// Send email with results
+		emailSubject := "IG Sniper Results"
+		emailBody := generateEmailContent(accTargets, results)
+		err := sendEmail(emailLogin, emailSubject, emailBody)
+		if err != nil {
+			color.Red.Printf("[%s] Failed to send results email: %v\n", in("!"), err)
+		} else {
+			color.Green.Printf("[%s] Results email sent to %s\n", in("*"), emailLogin)
 		}
 	} else {
 		fmt.Printf("[%s] Unable to log in. Status Code: %v\n", in("!"), resp.StatusCode)
 		fmt.Println(string(body))
-	}
-
-	// Send email notification for script start
-	startEmailSubject := "IG Sniper Script Started"
-	startEmailBody := "The IG Sniper script has started running."
-	err := sendEmail(os.Getenv("IG_EMAIL"), startEmailSubject, startEmailBody)
-	if err != nil {
-		color.Red.Printf("[%s] Failed to send start notification email: %v\n", in("!"), err)
-	} else {
-		color.Green.Printf("[%s] Start notification email sent to %s\n", in("*"), os.Getenv("IG_EMAIL"))
 	}
 }
