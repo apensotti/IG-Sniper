@@ -9,11 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"strconv"
 	"strings"
-	"syscall"
-	"time"
-	"unsafe"
 
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
