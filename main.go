@@ -199,22 +199,6 @@ func readAccFromEnv() Account {
 	}
 }
 
-func changeTitle(title string) (int, error) {
-	handle, err := syscall.LoadLibrary("Kernel32.dll")
-	if err != nil {
-		return 0, err
-	}
-	defer syscall.FreeLibrary(handle)
-	proc, err := syscall.GetProcAddress(handle, "SetConsoleTitleW")
-
-	if err != nil {
-		return 0, err
-	}
-
-	r, _, err := syscall.Syscall(proc, 1, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))), 0, 0)
-	return int(r), err
-}
-
 func getTargetsFromEnv() []string {
 	targetsStr := os.Getenv("IG_TARGETS")
 	return strings.Split(targetsStr, ",")
@@ -222,8 +206,6 @@ func getTargetsFromEnv() []string {
 
 func main() {
 	fmt.Print("\033[H\033[2J")
-	changeTitle("[IG Sniper] | NightfallGT")
-	printLogo()
 
 	acc := readAccFromEnv()
 	accTargets := getTargetsFromEnv()
