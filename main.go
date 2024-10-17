@@ -191,21 +191,14 @@ func getLines(path string) []string {
 
 }
 
-func readAcc() Account {
-	var obj Account
-	data, err := ioutil.ReadFile("config/account.json")
-	if err != nil {
-		color.Red.Println("\nUnable to read login.json file. Make sure that config/account.json exists")
-		fmt.Scanln()
+func readAccFromEnv() Account {
+	return Account{
+		Email:    os.Getenv("IG_EMAIL"),
+		Username: os.Getenv("IG_USERNAME"),
+		Password: os.Getenv("IG_PASSWORD"),
 	}
-
-	err = json.Unmarshal(data, &obj)
-	if err != nil {
-		color.Red.Println("\nError in json.Unmarshal")
-		fmt.Scanln()
-	}
-	return obj
 }
+
 func changeTitle(title string) (int, error) {
 	handle, err := syscall.LoadLibrary("Kernel32.dll")
 	if err != nil {
@@ -222,17 +215,9 @@ func changeTitle(title string) (int, error) {
 	return int(r), err
 }
 
-func printLogo() {
-	color.HiBlue.Println(`
-			██╗ ██████╗     ███████╗███╗   ██╗██╗██████╗ ███████╗██████╗ 
-			██║██╔════╝     ██╔════╝████╗  ██║██║██╔══██╗██╔════╝██╔══██╗
-			██║██║  ███╗    ███████╗██╔██╗ ██║██║██████╔╝█████╗  ██████╔╝
-			██║██║   ██║    ╚════██║██║╚██╗██║██║██╔═══╝ ██╔══╝  ██╔══██╗
-			██║╚██████╔╝    ███████║██║ ╚████║██║██║     ███████╗██║  ██║
-			╚═╝ ╚═════╝     ╚══════╝╚═╝  ╚═══╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
-								   by NightfallGT					 
-	`)
-	fmt.Print("\n\n")
+func getTargetsFromEnv() []string {
+	targetsStr := os.Getenv("IG_TARGETS")
+	return strings.Split(targetsStr, ",")
 }
 
 func main() {
@@ -240,30 +225,22 @@ func main() {
 	changeTitle("[IG Sniper] | NightfallGT")
 	printLogo()
 
-	acc := readAcc()
+	acc := readAccFromEnv()
+	accTargets := getTargetsFromEnv()
 
-	var emailLogin string
-	var usernameLogin string
-	var passwordLogin string
-
-	accTargets := getLines("config/targets.txt")
-
-	emailLogin = acc.Email
-	usernameLogin = acc.Username
-	passwordLogin = acc.Password
+	emailLogin := acc.Email
+	usernameLogin := acc.Username
+	passwordLogin := acc.Password
 
 	if len(emailLogin) < 1 {
+		color.Red.Println("Email not provided in environment variables")
 		return
 	}
 
 	fmt.Printf("[%s] Email: %s\n", in("-"), emailLogin)
 	fmt.Printf("[%s] Username: %s\n", in("-"), usernameLogin)
 	fmt.Printf("[%s] Password: %s\n\n", in("-"), strings.Repeat("*", len(passwordLogin)))
-	fmt.Printf("[%s] Press enter to begin.\n", in("+"))
-	fmt.Scanln()
 
-	fmt.Print("\033[H\033[2J")
-	printLogo()
 	fmt.Printf("[%s] Attempting to login through Instagram API.. \n", in("+"))
 
 	resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
@@ -271,54 +248,22 @@ func main() {
 	defer resp.Body.Close()
 
 	if strings.Contains(string(body), "\"authenticated\":true") {
-		usernameMethod := 1
-		sleepTime := 0
-		changeTitle("[IG Sniper] | Logged in as: " + usernameLogin)
 		fmt.Printf("[%s] Successfully logged in\n", in("*"))
 		fmt.Printf("[%s] Authenticated: True, userID: %s\n", in("*"), decode(body)["userId"])
-		fmt.Printf("[%s] Select username checking method. \n", in("+"))
-		fmt.Println(in("---------------------------"))
-		fmt.Println("\n[1] Create Username Check")
-		fmt.Println("[2] URL Username Check")
-
-		fmt.Print("Enter number choice: ")
-		fmt.Scan(&usernameMethod)
-		fmt.Println()
-		fmt.Print("Enter sleep time [in seconds](0 for none): ")
-		fmt.Scan(&sleepTime)
-		fmt.Println()
-
-		fmt.Print("\033[H\033[2J")
-		printLogo()
 
 		var attemptCount int = 0
 
-		for {
-			for _, target := range accTargets {
-				attemptCount += 1
-				changeTitle("[IG Sniper] | Logged in as: " + usernameLogin + " | Target: " + target + " | Request: " + strconv.Itoa(attemptCount))
+		for _, target := range accTargets {
+			attemptCount += 1
+			fmt.Printf("[%s] Checking username: %s\n", in("+"), target)
 
-				switch usernameMethod {
-				case 1:
-					if createCheck(target) {
-						updateDetails(csrf, emailLogin, target)
-					}
-				case 2:
-					if urlCheck(target) {
-						updateDetails(csrf, emailLogin, target)
-					}
-				}
+			if createCheck(target) {
+				updateDetails(csrf, emailLogin, target)
 			}
-			changeTitle("[IG Sniper] | Logged in as: " + usernameLogin + " | Sleeping.. | Request: " + strconv.Itoa(attemptCount))
-			if sleepTime != 0 {
-				fmt.Printf("[%s] Sleeping for %v seconds..\n", in("+"), sleepTime)
-			}
-			time.Sleep(time.Duration(sleepTime) * time.Second)
 		}
 
 	} else {
 		fmt.Printf("[%s] Unable to log in. Status Code: %v\n", in("!"), resp.StatusCode)
 		fmt.Println(string(body))
 	}
-	fmt.Scanln()
 }

@@ -1,0 +1,30 @@
+name: IG Sniper
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run-ig-sniper:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+
+    - name: Install dependencies
+      run: |
+        go get "github.com/dlclark/regexp2"
+        go get "github.com/gookit/color"
+
+    - name: Run IG Sniper
+      env:
+        IG_EMAIL: ${{ secrets.IG_EMAIL }}
+        IG_USERNAME: ${{ secrets.IG_USERNAME }}
+        IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+        IG_TARGETS: ${{ secrets.IG_TARGETS }}
+      run: go run main.go
