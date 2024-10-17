@@ -25,7 +25,10 @@ jobs:
         go get "github.com/gookit/color"
 
     - name: Build
-      run: go build -v .
+      run: go build -o ig-sniper -v .
+
+    - name: List directory contents
+      run: ls -la
 
     - name: Run IG Sniper
       env:
