@@ -10,7 +10,6 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
-	"strconv"
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
 	"net/smtp"
