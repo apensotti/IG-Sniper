@@ -150,7 +150,7 @@ func createCheck(check string) bool {
 	}
 }
 
-func login(username string, password string) (*http.Response, string) {
+func login(username string, password string) (*http.Response, string, error) {
 	csrfToken := getCSRF()
 	data := fmt.Sprintf("username=%s&enc_password=#PWD_INSTAGRAM_BROWSER:0:0:%s&queryParams={}&optIntoOneTap=false", username, password)
 	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/login/ajax/", bytes.NewBuffer([]byte(data)))
@@ -165,11 +165,15 @@ func login(username string, password string) (*http.Response, string) {
 
 	resp, err := cookieClient.Do(req)
 	if err != nil {
-		fmt.Println("Error occurred when trying to login:", err)
-		return nil, ""
+		return nil, "", fmt.Errorf("Error occurred when trying to login: %v", err)
 	}
 
-	return resp, csrfToken
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return resp, csrfToken, fmt.Errorf("Login failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	return resp, csrfToken, nil
 }
 
 func getLines(path string) []string {
@@ -269,9 +273,9 @@ func main() {
 
 	fmt.Println("Attempting to login through Instagram API...")
 
-	resp, csrf := login(usernameLogin, passwordLogin)
-	if resp == nil {
-		fmt.Println("Failed to get response from login request")
+	resp, csrf, err := login(usernameLogin, passwordLogin)
+	if err != nil {
+		fmt.Println("Login failed:", err)
 		return
 	}
 
@@ -325,7 +329,7 @@ func main() {
 			fmt.Println("Results email sent to", emailLogin)
 		}
 	} else {
-		fmt.Println("Unable to log in. Status Code:", resp.StatusCode)
+		fmt.Println("Unable to log in. Authentication failed.")
 		fmt.Println("Login response:", string(body))
 	}
 }
