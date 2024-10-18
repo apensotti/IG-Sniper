@@ -209,6 +209,13 @@ func sendEmail(to, subject, body string) error {
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 
+	logDetails(&details, "Attempting to send email:")
+	logDetails(&details, "From: %s", from)
+	logDetails(&details, "To: %s", to)
+	logDetails(&details, "Subject: %s", subject)
+	logDetails(&details, "SMTP Host: %s", smtpHost)
+	logDetails(&details, "SMTP Port: %s", smtpPort)
+
 	msg := []byte("To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
 		"\r\n" +
@@ -218,8 +225,10 @@ func sendEmail(to, subject, body string) error {
 
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, msg)
 	if err != nil {
+		logDetails(&details, "Error sending email: %v", err)
 		return err
 	}
+	logDetails(&details, "Email sent successfully")
 	return nil
 }
 
