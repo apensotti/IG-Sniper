@@ -13,7 +13,6 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
 	"net/smtp"
-	"time"
 )
 
 var (
@@ -204,19 +203,11 @@ func getTargetsFromEnv() []string {
 	return strings.Split(targetsStr, ",")
 }
 
-func sendEmail(to, subject, body string) (string, error) {
-	var log strings.Builder
+func sendEmail(to, subject, body string) error {
 	from := os.Getenv("SMTP_FROM")
 	password := os.Getenv("SMTP_PASSWORD")
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
-
-	log.WriteString(fmt.Sprintf("Attempting to send email:\n"))
-	log.WriteString(fmt.Sprintf("From: %s\n", from))
-	log.WriteString(fmt.Sprintf("To: %s\n", to))
-	log.WriteString(fmt.Sprintf("Subject: %s\n", subject))
-	log.WriteString(fmt.Sprintf("SMTP Host: %s\n", smtpHost))
-	log.WriteString(fmt.Sprintf("SMTP Port: %s\n", smtpPort))
 
 	msg := []byte("To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
@@ -227,11 +218,9 @@ func sendEmail(to, subject, body string) (string, error) {
 
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, msg)
 	if err != nil {
-		log.WriteString(fmt.Sprintf("Error sending email: %v\n", err))
-		return log.String(), err
+		return err
 	}
-	log.WriteString("Email sent successfully\n")
-	return log.String(), nil
+	return nil
 }
 
 func generateEmailContent(targets []string, results map[string]bool) string {
@@ -251,83 +240,76 @@ func logDetails(details *strings.Builder, format string, a ...interface{}) {
 }
 
 func main() {
-	for {
-		fmt.Print("\033[H\033[2J")
+	fmt.Print("\033[H\033[2J")
 
-		var details strings.Builder
-		logDetails(&details, "IG Sniper Script Started")
+	var details strings.Builder
+	logDetails(&details, "IG Sniper Script Started")
 
-		acc := readAccFromEnv()
-		accTargets := getTargetsFromEnv()
+	acc := readAccFromEnv()
+	accTargets := getTargetsFromEnv()
 
-		emailLogin := acc.Email
-		usernameLogin := acc.Username
-		passwordLogin := acc.Password
+	emailLogin := acc.Email
+	usernameLogin := acc.Username
+	passwordLogin := acc.Password
 
-		if len(emailLogin) < 1 {
-			logDetails(&details, "Error: Email not provided in environment variables")
-			color.Red.Println("Email not provided in environment variables")
-			return
-		}
+	if len(emailLogin) < 1 {
+		logDetails(&details, "Error: Email not provided in environment variables")
+		color.Red.Println("Email not provided in environment variables")
+		return
+	}
 
-		logDetails(&details, "Email: %s", emailLogin)
-		logDetails(&details, "Username: %s", usernameLogin)
-		logDetails(&details, "Password: %s", strings.Repeat("*", len(passwordLogin)))
+	logDetails(&details, "Email: %s", emailLogin)
+	logDetails(&details, "Username: %s", usernameLogin)
+	logDetails(&details, "Password: %s", strings.Repeat("*", len(passwordLogin)))
 
-		logDetails(&details, "Attempting to login through Instagram API...")
+	logDetails(&details, "Attempting to login through Instagram API...")
 
-		resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
-		body, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
+	resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
 
-		if strings.Contains(string(body), "\"authenticated\":true") {
-			logDetails(&details, "Successfully logged in")
-			logDetails(&details, "Authenticated: True, userID: %s", decode(body)["userId"])
+	if strings.Contains(string(body), "\"authenticated\":true") {
+		logDetails(&details, "Successfully logged in")
+		logDetails(&details, "Authenticated: True, userID: %s", decode(body)["userId"])
 
-			results := make(map[string]bool)
+		results := make(map[string]bool)
 
-			for _, target := range accTargets {
-				logDetails(&details, "Checking username: %s", target)
+		for _, target := range accTargets {
+			logDetails(&details, "Checking username: %s", target)
 
-				if createCheck(target) {
-					results[target] = true
-					logDetails(&details, "Username %s is available", target)
-					if updateDetails(csrf, emailLogin, target) {
-						logDetails(&details, "Successfully claimed username: %s", target)
-						emailSubject := "Instagram Username Claimed"
-						emailBody := fmt.Sprintf("The username %s has been successfully claimed.\n\nDetails:\n%s", target, details.String())
-						emailLog, err := sendEmail(emailLogin, emailSubject, emailBody)
-						logDetails(&details, emailLog)
-						if err != nil {
-							logDetails(&details, "Failed to send email notification: %v", err)
-						} else {
-							logDetails(&details, "Email notification sent to %s", emailLogin)
-						}
-						return // Exit the program after successfully claiming the username
+			if createCheck(target) {
+				results[target] = true
+				logDetails(&details, "Username %s is available", target)
+				if updateDetails(csrf, emailLogin, target) {
+					logDetails(&details, "Successfully claimed username: %s", target)
+					emailSubject := "Instagram Username Claimed"
+					emailBody := fmt.Sprintf("The username %s has been successfully claimed.\n\nDetails:\n%s", target, details.String())
+					err := sendEmail(emailLogin, emailSubject, emailBody)
+					if err != nil {
+						logDetails(&details, "Failed to send email notification: %v", err)
+					} else {
+						logDetails(&details, "Email notification sent to %s", emailLogin)
 					}
-				} else {
-					results[target] = false
+					return // Exit the program after successfully claiming the username
 				}
-			}
-
-			// Send email with results
-			emailSubject := "IG Sniper Results"
-			emailBody := generateEmailContent(accTargets, results)
-			emailBody += "\n\nDetails:\n" + details.String()
-			emailLog, err := sendEmail(emailLogin, emailSubject, emailBody)
-			logDetails(&details, emailLog)
-
-			if err != nil {
-				logDetails(&details, "Failed to send results email: %v", err)
 			} else {
-				logDetails(&details, "Results email sent to %s", emailLogin)
+				results[target] = false
 			}
-		} else {
-			logDetails(&details, "Unable to log in. Status Code: %v", resp.StatusCode)
-			logDetails(&details, "Response body: %s", string(body))
 		}
 
-		// Wait for 30 minutes before the next iteration
-		time.Sleep(30 * time.Minute)
+		// Send email with results
+		emailSubject := "IG Sniper Results"
+		emailBody := generateEmailContent(accTargets, results)
+		emailBody += "\n\nDetails:\n" + details.String()
+		err := sendEmail(emailLogin, emailSubject, emailBody)
+
+		if err != nil {
+			logDetails(&details, "Failed to send results email: %v", err)
+		} else {
+			logDetails(&details, "Results email sent to %s", emailLogin)
+		}
+	} else {
+		logDetails(&details, "Unable to log in. Status Code: %v", resp.StatusCode)
+		logDetails(&details, "Login response: %s", string(body))
 	}
 }

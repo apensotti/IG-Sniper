@@ -1,6 +1,8 @@
 name: IG Sniper
 
 on:
+  schedule:
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +27,9 @@ jobs:
     - name: Build
       run: go build -o ig-sniper -v .
 
+    - name: List directory contents
+      run: ls -la
+
     - name: Run IG Sniper
       env:
         IG_EMAIL: ${{ secrets.IG_EMAIL }}
@@ -35,8 +40,4 @@ jobs:
         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         SMTP_HOST: ${{ secrets.SMTP_HOST }}
         SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      run: |
-        while true; do
-          ./ig-sniper
-          sleep 1800
-        done
+      run: ./ig-sniper
