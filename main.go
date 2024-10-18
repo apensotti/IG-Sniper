@@ -274,6 +274,25 @@ func logDetails(details *strings.Builder, format string, a ...interface{}) {
 	details.WriteString(fmt.Sprintf(format+"\n", a...))
 }
 
+func loginWithCookie(sessionCookie string) (*http.Response, string, error) {
+	req, _ := http.NewRequest("GET", "https://www.instagram.com/", nil)
+	req.Header.Set("Cookie", sessionCookie)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("Error occurred during login: %v", err)
+	}
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	// Extract CSRF token from the response if needed
+	csrfToken := extractCSRFToken(body)
+
+	return resp, csrfToken, nil
+}
+
 func main() {
 	fmt.Println("IG Sniper Script Started")
 
@@ -374,4 +393,3 @@ func main() {
 	}
 	
 }
-
