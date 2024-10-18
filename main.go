@@ -176,6 +176,26 @@ func login(username string, password string) (*http.Response, string) {
 	return resp, resp.Cookies()[0].Value
 }
 
+func loginWithCookie(sessionCookie string) (*http.Response, string) {
+	req, _ := http.NewRequest("GET", "https://www.instagram.com/", nil)
+	req.Header.Set("Cookie", sessionCookie)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error occurred during login:", err)
+		return nil, ""
+	}
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	// Extract CSRF token from the response if needed
+	csrfToken := extractCSRFToken(body)
+
+	return resp, csrfToken
+}
+
 func getLines(path string) []string {
 	file, err := os.Open(path)
 	if err != nil {
