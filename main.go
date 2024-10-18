@@ -204,18 +204,19 @@ func getTargetsFromEnv() []string {
 	return strings.Split(targetsStr, ",")
 }
 
-func sendEmail(to, subject, body string) error {
+func sendEmail(to, subject, body string) (string, error) {
+	var log strings.Builder
 	from := os.Getenv("SMTP_FROM")
 	password := os.Getenv("SMTP_PASSWORD")
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 
-	logDetails(&details, "Attempting to send email:")
-	logDetails(&details, "From: %s", from)
-	logDetails(&details, "To: %s", to)
-	logDetails(&details, "Subject: %s", subject)
-	logDetails(&details, "SMTP Host: %s", smtpHost)
-	logDetails(&details, "SMTP Port: %s", smtpPort)
+	log.WriteString(fmt.Sprintf("Attempting to send email:\n"))
+	log.WriteString(fmt.Sprintf("From: %s\n", from))
+	log.WriteString(fmt.Sprintf("To: %s\n", to))
+	log.WriteString(fmt.Sprintf("Subject: %s\n", subject))
+	log.WriteString(fmt.Sprintf("SMTP Host: %s\n", smtpHost))
+	log.WriteString(fmt.Sprintf("SMTP Port: %s\n", smtpPort))
 
 	msg := []byte("To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
@@ -226,11 +227,11 @@ func sendEmail(to, subject, body string) error {
 
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, msg)
 	if err != nil {
-		logDetails(&details, "Error sending email: %v", err)
-		return err
+		log.WriteString(fmt.Sprintf("Error sending email: %v\n", err))
+		return log.String(), err
 	}
-	logDetails(&details, "Email sent successfully")
-	return nil
+	log.WriteString("Email sent successfully\n")
+	return log.String(), nil
 }
 
 func generateEmailContent(targets []string, results map[string]bool) string {
@@ -295,7 +296,8 @@ func main() {
 						logDetails(&details, "Successfully claimed username: %s", target)
 						emailSubject := "Instagram Username Claimed"
 						emailBody := fmt.Sprintf("The username %s has been successfully claimed.\n\nDetails:\n%s", target, details.String())
-						err := sendEmail(emailLogin, emailSubject, emailBody)
+						emailLog, err := sendEmail(emailLogin, emailSubject, emailBody)
+						logDetails(&details, emailLog)
 						if err != nil {
 							logDetails(&details, "Failed to send email notification: %v", err)
 						} else {
@@ -312,7 +314,8 @@ func main() {
 			emailSubject := "IG Sniper Results"
 			emailBody := generateEmailContent(accTargets, results)
 			emailBody += "\n\nDetails:\n" + details.String()
-			err := sendEmail(emailLogin, emailSubject, emailBody)
+			emailLog, err := sendEmail(emailLogin, emailSubject, emailBody)
+			logDetails(&details, emailLog)
 
 			if err != nil {
 				logDetails(&details, "Failed to send results email: %v", err)
