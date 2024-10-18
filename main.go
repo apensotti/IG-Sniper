@@ -277,6 +277,7 @@ func main() {
 		for _, target := range accTargets {
 			logDetails(&details, "Checking username: %s", target)
 
+			
 			if createCheck(target) {
 				results[target] = true
 				logDetails(&details, "Username %s is available", target)
