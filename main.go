@@ -151,47 +151,23 @@ func createCheck(check string) bool {
 }
 
 func login(username string, password string) (*http.Response, string) {
-	data := "username=" + username + "&enc_password=" + password + "&queryParams={}&optIntoOneTap=false"
-	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/login/ajax/", bytes.NewBuffer([]byte(data)))
 	csrfToken := getCSRF()
+	data := fmt.Sprintf("username=%s&enc_password=#PWD_INSTAGRAM_BROWSER:0:0:%s&queryParams={}&optIntoOneTap=false", username, password)
+	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/login/ajax/", bytes.NewBuffer([]byte(data)))
 
-	req.Header.Set("accept", "*/*")
-	req.Header.Set("accept-language", "en-US,en;q=0.9")
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
-	req.Header.Set("sec-fetch-dest", "empty")
-	req.Header.Set("sec-fetch-mode", "cors")
-	req.Header.Set("sec-fetch-site", "same-origin")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Referer", "https://www.instagram.com/")
 	req.Header.Set("x-csrftoken", csrfToken)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/83.0.4103.116 Safari/537.36")
 
 	jar, _ := cookiejar.New(nil)
 	cookieClient = &http.Client{Jar: jar}
 
 	resp, err := cookieClient.Do(req)
-
 	if err != nil {
-		fmt.Println("Error occured when trying to login.")
-		fmt.Scanln()
-	}
-	return resp, resp.Cookies()[0].Value
-}
-
-func loginWithCookie(sessionCookie string) (*http.Response, string) {
-	req, _ := http.NewRequest("GET", "https://www.instagram.com/", nil)
-	req.Header.Set("Cookie", sessionCookie)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error occurred during login:", err)
+		fmt.Println("Error occurred when trying to login:", err)
 		return nil, ""
 	}
-
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-
-	// Extract CSRF token from the response if needed
-	csrfToken := extractCSRFToken(body)
 
 	return resp, csrfToken
 }
@@ -293,16 +269,24 @@ func main() {
 
 	fmt.Println("Attempting to login through Instagram API...")
 
-	resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
+	resp, csrf := login(usernameLogin, passwordLogin)
+	if resp == nil {
+		fmt.Println("Failed to get response from login request")
+		return
+	}
+
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
 	fmt.Println("Login response status:", resp.StatusCode)
 	fmt.Println("Login response body:", string(body))
 
-	if strings.Contains(string(body), "\"authenticated\":true") {
+	var loginResponse map[string]interface{}
+	json.Unmarshal(body, &loginResponse)
+
+	if loginResponse["authenticated"] == true {
 		fmt.Println("Successfully logged in")
-		fmt.Println("Authenticated: True, userID:", decode(body)["userId"])
+		fmt.Println("Authenticated: True, userID:", loginResponse["userId"])
 
 		results := make(map[string]bool)
 
