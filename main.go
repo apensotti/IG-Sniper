@@ -242,18 +242,18 @@ func logDetails(details *strings.Builder, format string, a ...interface{}) {
 }
 
 func main() {
-	fmt.Print("\033[H\033[2J")
+	fmt.Println("IG Sniper Script Started")
 
 	var details strings.Builder
 	logDetails(&details, "IG Sniper Script Started")
 
 	// Log all environment variables (except password)
-	logDetails(&details, "IG_EMAIL: %s", os.Getenv("IG_EMAIL"))
-	logDetails(&details, "IG_USERNAME: %s", os.Getenv("IG_USERNAME"))
-	logDetails(&details, "IG_TARGETS: %s", os.Getenv("IG_TARGETS"))
-	logDetails(&details, "SMTP_FROM: %s", os.Getenv("SMTP_FROM"))
-	logDetails(&details, "SMTP_HOST: %s", os.Getenv("SMTP_HOST"))
-	logDetails(&details, "SMTP_PORT: %s", os.Getenv("SMTP_PORT"))
+	fmt.Println("IG_EMAIL:", os.Getenv("IG_EMAIL"))
+	fmt.Println("IG_USERNAME:", os.Getenv("IG_USERNAME"))
+	fmt.Println("IG_TARGETS:", os.Getenv("IG_TARGETS"))
+	fmt.Println("SMTP_FROM:", os.Getenv("SMTP_FROM"))
+	fmt.Println("SMTP_HOST:", os.Getenv("SMTP_HOST"))
+	fmt.Println("SMTP_PORT:", os.Getenv("SMTP_PORT"))
 
 	acc := readAccFromEnv()
 	accTargets := getTargetsFromEnv()
@@ -263,49 +263,44 @@ func main() {
 	passwordLogin := acc.Password
 
 	if len(emailLogin) < 1 {
-		logDetails(&details, "Error: Email not provided in environment variables")
-		color.Red.Println("Email not provided in environment variables")
+		fmt.Println("Error: Email not provided in environment variables")
 		return
 	}
 
-	logDetails(&details, "Email: %s", emailLogin)
-	logDetails(&details, "Username: %s", usernameLogin)
-	logDetails(&details, "Password: %s", strings.Repeat("*", len(passwordLogin)))
-	logDetails(&details, "Targets: %v", accTargets)
+	fmt.Println("Email:", emailLogin)
+	fmt.Println("Username:", usernameLogin)
+	fmt.Println("Targets:", accTargets)
 
-	logDetails(&details, "Attempting to login through Instagram API...")
+	fmt.Println("Attempting to login through Instagram API...")
 
 	resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
-	logDetails(&details, "Login response status: %d", resp.StatusCode)
-	logDetails(&details, "Login response body: %s", string(body))
+	fmt.Println("Login response status:", resp.StatusCode)
+	fmt.Println("Login response body:", string(body))
 
 	if strings.Contains(string(body), "\"authenticated\":true") {
-		logDetails(&details, "Successfully logged in")
-		logDetails(&details, "Authenticated: True, userID: %s", decode(body)["userId"])
+		fmt.Println("Successfully logged in")
+		fmt.Println("Authenticated: True, userID:", decode(body)["userId"])
 
 		results := make(map[string]bool)
 
 		for _, target := range accTargets {
-			logDetails(&details, "Checking username: %s", target)
-
+			fmt.Println("Checking username:", target)
 			
 			if createCheck(target) {
 				results[target] = true
-				logDetails(&details, "Username %s is available", target)
+				fmt.Println("Username", target, "is available")
 				if updateDetails(csrf, emailLogin, target) {
-					logDetails(&details, "Successfully claimed username: %s", target)
+					fmt.Println("Successfully claimed username:", target)
 					emailSubject := "Instagram Username Claimed"
 					emailBody := fmt.Sprintf("The username %s has been successfully claimed.\n\nDetails:\n%s", target, details.String())
 					err := sendEmail(emailLogin, emailSubject, emailBody)
 					if err != nil {
-						logDetails(&details, "Failed to send email notification: %v", err)
-						color.Red.Printf("Email sending error: %v\n", err)
+						fmt.Println("Failed to send email notification:", err)
 					} else {
-						logDetails(&details, "Email notification sent to %s", emailLogin)
-						color.Green.Printf("Email notification sent to %s\n", emailLogin)
+						fmt.Println("Email notification sent to", emailLogin)
 					}
 					return // Exit the program after successfully claiming the username
 				}
@@ -321,12 +316,12 @@ func main() {
 		err := sendEmail(emailLogin, emailSubject, emailBody)
 
 		if err != nil {
-			logDetails(&details, "Failed to send results email: %v", err)
+			fmt.Println("Failed to send results email:", err)
 		} else {
-			logDetails(&details, "Results email sent to %s", emailLogin)
+			fmt.Println("Results email sent to", emailLogin)
 		}
 	} else {
-		logDetails(&details, "Unable to log in. Status Code: %v", resp.StatusCode)
-		logDetails(&details, "Login response: %s", string(body))
+		fmt.Println("Unable to log in. Status Code:", resp.StatusCode)
+		fmt.Println("Login response:", string(body))
 	}
 }
