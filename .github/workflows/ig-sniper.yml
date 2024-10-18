@@ -40,4 +40,7 @@ jobs:
         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         SMTP_HOST: ${{ secrets.SMTP_HOST }}
         SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      run: ./ig-sniper
+      run: |
+        echo "Starting IG Sniper..."
+        ./ig-sniper
+        echo "IG Sniper execution completed."

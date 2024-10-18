@@ -120,13 +120,15 @@ func createCheck(check string) bool {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		fmt.Println("Error occured")
-		fmt.Scanln()
+		fmt.Printf("Error occurred during createCheck: %v\n", err)
+		return false
 	}
 
 	body, _ := ioutil.ReadAll(resp.Body)
 	response := string(body)
 	defer resp.Body.Close()
+
+	fmt.Printf("createCheck response for %s: Status: %d, Body: %s\n", check, resp.StatusCode, response)
 
 	if strings.Contains(response, "spam") {
 		color.Red.Println("[+] Spam detected")
@@ -245,6 +247,14 @@ func main() {
 	var details strings.Builder
 	logDetails(&details, "IG Sniper Script Started")
 
+	// Log all environment variables (except password)
+	logDetails(&details, "IG_EMAIL: %s", os.Getenv("IG_EMAIL"))
+	logDetails(&details, "IG_USERNAME: %s", os.Getenv("IG_USERNAME"))
+	logDetails(&details, "IG_TARGETS: %s", os.Getenv("IG_TARGETS"))
+	logDetails(&details, "SMTP_FROM: %s", os.Getenv("SMTP_FROM"))
+	logDetails(&details, "SMTP_HOST: %s", os.Getenv("SMTP_HOST"))
+	logDetails(&details, "SMTP_PORT: %s", os.Getenv("SMTP_PORT"))
+
 	acc := readAccFromEnv()
 	accTargets := getTargetsFromEnv()
 
@@ -261,12 +271,16 @@ func main() {
 	logDetails(&details, "Email: %s", emailLogin)
 	logDetails(&details, "Username: %s", usernameLogin)
 	logDetails(&details, "Password: %s", strings.Repeat("*", len(passwordLogin)))
+	logDetails(&details, "Targets: %v", accTargets)
 
 	logDetails(&details, "Attempting to login through Instagram API...")
 
 	resp, csrf := login(usernameLogin, "#PWD_INSTAGRAM_BROWSER:0:0:"+passwordLogin)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
+
+	logDetails(&details, "Login response status: %d", resp.StatusCode)
+	logDetails(&details, "Login response body: %s", string(body))
 
 	if strings.Contains(string(body), "\"authenticated\":true") {
 		logDetails(&details, "Successfully logged in")
