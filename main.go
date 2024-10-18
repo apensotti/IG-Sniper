@@ -13,6 +13,8 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/gookit/color"
 	"net/smtp"
+	"time"
+	"net/url"
 )
 
 var (
@@ -37,10 +39,20 @@ func getCSRF() string {
 	regx := regexp2.MustCompile("(?<=\"csrf_token\":\")\\w+", 0)
 
 	req, _ := http.NewRequest("GET", "https://www.instagram.com/", nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/83.0.4103.116 Safari/537.36")
-	resp, _ := client.Do(req)
-	body, _ := ioutil.ReadAll(resp.Body)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error getting CSRF token:", err)
+		return ""
+	}
 	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
 
 	if m, _ := regx.FindStringMatch(string(body)); m != nil {
 		return m.String()
@@ -48,7 +60,7 @@ func getCSRF() string {
 	return ""
 }
 
-func updateDetails(csrfToken string, email string, username string) bool {
+func updateDetails(csrfToken string, email string, username string) (bool, error) {
 	data := "first_name=&email=" + email + "&username=" + username + "&phone_number=&biography=" + "" + "&external_url=&chaining_enabled=on"
 	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/edit/", bytes.NewBuffer([]byte(data)))
 	req.Header.Set("accept", "*/*")
@@ -78,10 +90,10 @@ func updateDetails(csrfToken string, email string, username string) bool {
 
 	if strings.Contains(response, "\"status\":\"ok\"") {
 		color.Green.Printf("[+] Successfully updated username to %s\n", username)
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 func urlCheck(check string) bool {
@@ -152,16 +164,37 @@ func createCheck(check string) bool {
 
 func login(username string, password string) (*http.Response, string, error) {
 	csrfToken := getCSRF()
+	if csrfToken == "" {
+		return nil, "", fmt.Errorf("Failed to get CSRF token")
+	}
+
 	data := fmt.Sprintf("username=%s&enc_password=#PWD_INSTAGRAM_BROWSER:0:0:%s&queryParams={}&optIntoOneTap=false", username, password)
 	req, _ := http.NewRequest("POST", "https://www.instagram.com/accounts/login/ajax/", bytes.NewBuffer([]byte(data)))
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Referer", "https://www.instagram.com/")
+	req.Header.Set("Referer", "https://www.instagram.com/accounts/login/")
 	req.Header.Set("x-csrftoken", csrfToken)
+	req.Header.Set("X-Instagram-AJAX", "1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Origin", "https://www.instagram.com")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Dest", "empty")
 
 	jar, _ := cookiejar.New(nil)
-	cookieClient = &http.Client{Jar: jar}
+	cookieClient = &http.Client{
+		Jar: jar,
+		Timeout: time.Second * 10,
+	}
+
+	// Set cookies
+	u, _ := url.Parse("https://www.instagram.com")
+	jar.SetCookies(u, []*http.Cookie{
+		{Name: "csrftoken", Value: csrfToken},
+	})
 
 	resp, err := cookieClient.Do(req)
 	if err != nil {
@@ -272,6 +305,7 @@ func main() {
 	fmt.Println("Targets:", accTargets)
 
 	fmt.Println("Attempting to login through Instagram API...")
+	time.Sleep(2 * time.Second) // Add a delay before login
 
 	resp, csrf, err := login(usernameLogin, passwordLogin)
 	if err != nil {
@@ -300,7 +334,10 @@ func main() {
 			if createCheck(target) {
 				results[target] = true
 				fmt.Println("Username", target, "is available")
-				if updateDetails(csrf, emailLogin, target) {
+				updateSuccess, updateErr := updateDetails(csrf, emailLogin, target)
+				if updateErr != nil {
+					fmt.Printf("Error updating details for %s: %v\n", target, updateErr)
+				} else if updateSuccess {
 					fmt.Println("Successfully claimed username:", target)
 					emailSubject := "Instagram Username Claimed"
 					emailBody := fmt.Sprintf("The username %s has been successfully claimed.\n\nDetails:\n%s", target, details.String())
@@ -311,9 +348,12 @@ func main() {
 						fmt.Println("Email notification sent to", emailLogin)
 					}
 					return // Exit the program after successfully claiming the username
+				} else {
+					fmt.Printf("Failed to claim username: %s\n", target)
 				}
 			} else {
 				results[target] = false
+				fmt.Printf("Username %s is not available\n", target)
 			}
 		}
 
