@@ -287,8 +287,10 @@ func main() {
 					err := sendEmail(emailLogin, emailSubject, emailBody)
 					if err != nil {
 						logDetails(&details, "Failed to send email notification: %v", err)
+						color.Red.Printf("Email sending error: %v\n", err)
 					} else {
 						logDetails(&details, "Email notification sent to %s", emailLogin)
+						color.Green.Printf("Email notification sent to %s\n", emailLogin)
 					}
 					return // Exit the program after successfully claiming the username
 				}
