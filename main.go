@@ -372,4 +372,6 @@ func main() {
 		fmt.Println("Unable to log in. Authentication failed.")
 		fmt.Println("Login response:", string(body))
 	}
+	
 }
+
